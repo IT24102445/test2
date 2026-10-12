@@ -118,15 +118,15 @@ int connect_and_auto_auth(const char *ip, int port) {
 
 int main(int argc, char *argv[]) {
     const char *target_ip = AGENT_IP;
-    int auto_auth = 1;
+    int auto_auth = 0;
     char recv_buf[BUFFER_SIZE];
     char user_input[BUFFER_SIZE];
     pthread_t udp_thread;
     int udp_port = 8888;
 
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--no-auth") == 0 || strcmp(argv[i], "--manual") == 0) {
-            auto_auth = 0;
+        if (strcmp(argv[i], "--auto-auth") == 0) {
+            auto_auth = 1;
         } else {
             target_ip = argv[i];
         }
@@ -147,8 +147,8 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Failed to connect to Agent.\n");
             return EXIT_FAILURE;
         }
-        printf("[+] Connected to Agent without authentication (Manual Mode).\n");
-        printf("\n=== Controller Active (Manual / Pre-Auth Mode) ===\n");
+        printf("[+] Connected to Agent: %s:%d\n", target_ip, AGENT_PORT);
+        printf("=== Controller Active (Manual Authentication Mode) ===\n");
         printf("Type commands to send (e.g. TIME, SYSINFO, AUTH OPS-2445, LISTPROC, QUIT):\n\n");
     }
 
