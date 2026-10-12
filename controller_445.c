@@ -60,7 +60,7 @@ int read_line(int socket_fd, char *buffer, size_t max_len) {
     return count;
 }
 
-int connect_and_auto_auth(const char *ip, int port) {
+int connect_to_agent(const char *ip, int port) {
     int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (sock_fd < 0) {
         perror("Socket creation error");
@@ -83,6 +83,12 @@ int connect_and_auto_auth(const char *ip, int port) {
         close(sock_fd);
         return -1;
     }
+    return sock_fd;
+}
+
+int connect_and_auto_auth(const char *ip, int port) {
+    int sock_fd = connect_to_agent(ip, port);
+    if (sock_fd < 0) return -1;
 
     // 1. Send AUTH command immediately
     char auth_cmd[256];
@@ -111,21 +117,36 @@ int connect_and_auto_auth(const char *ip, int port) {
 }
 
 int main(int argc, char *argv[]) {
-    const char *target_ip = (argc > 1) ? argv[1] : AGENT_IP;
+    const char *target_ip = AGENT_IP;
+    int auto_auth = 1;
 
-    int agent_fd = connect_and_auto_auth(target_ip, AGENT_PORT);
-    if (agent_fd < 0) {
-        fprintf(stderr, "Failed to connect and authenticate with Agent.\n");
-        return EXIT_FAILURE;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--no-auth") == 0 || strcmp(argv[i], "--manual") == 0) {
+            auto_auth = 0;
+        } else {
+            target_ip = argv[i];
+        }
     }
 
-    char recv_buf[BUFFER_SIZE];
-    char user_input[BUFFER_SIZE];
-    pthread_t udp_thread;
-    int udp_port = 8888;
-
-    printf("\n=== Controller Active (Auto-Authenticated) ===\n");
-    printf("Type commands to send (e.g. SYSINFO, LISTPROC, PUT <file>, GET <file>, MONITOR START 8888, QUIT):\n\n");
+    int agent_fd = -1;
+    if (auto_auth) {
+        agent_fd = connect_and_auto_auth(target_ip, AGENT_PORT);
+        if (agent_fd < 0) {
+            fprintf(stderr, "Failed to connect and authenticate with Agent.\n");
+            return EXIT_FAILURE;
+        }
+        printf("\n=== Controller Active (Auto-Authenticated) ===\n");
+        printf("Type commands to send (e.g. TIME, SYSINFO, LISTPROC, PUT <file>, GET <file>, MONITOR START 8888, QUIT):\n\n");
+    } else {
+        agent_fd = connect_to_agent(target_ip, AGENT_PORT);
+        if (agent_fd < 0) {
+            fprintf(stderr, "Failed to connect to Agent.\n");
+            return EXIT_FAILURE;
+        }
+        printf("[+] Connected to Agent without authentication (Manual Mode).\n");
+        printf("\n=== Controller Active (Manual / Pre-Auth Mode) ===\n");
+        printf("Type commands to send (e.g. TIME, SYSINFO, AUTH OPS-2445, LISTPROC, QUIT):\n\n");
+    }
 
     while (1) {
         printf("controller> ");
