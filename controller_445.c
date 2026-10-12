@@ -203,6 +203,11 @@ int main(int argc, char *argv[]) {
         }
         printf("Agent Response: %s\n", recv_buf);
 
+        if (strstr(recv_buf, "TOO_MANY_ATTEMPTS") != NULL) {
+            printf("[-] Connection closed by server: Maximum failed authentication attempts exceeded.\n");
+            break;
+        }
+
         if (strncmp(user_input, "MONITOR START", 13) == 0 && strncmp(recv_buf, "OK", 2) == 0) {
             sscanf(user_input, "MONITOR START %d", &udp_port);
             udp_running = 1;

@@ -1,0 +1,45 @@
+IE3090 - Network Programming (Lab Test Version 1.A)
+Student Registration Number: IT24102445
+Session Identification Tag (SID): SID:5442
+Authentication Token: OPS-2445
+
+============================================================
+(1) CALCULATED LIMIT:
+============================================================
+Failed AUTH Attempt Limit = 3 attempts per connection
+
+Details:
+- Each individual TCP client connection is tracked independently in its own thread.
+- First failure (Attempt 1): Returns ERR 001 AUTH_FAILED SID:5442
+- Second failure (Attempt 2): Returns ERR 001 AUTH_FAILED SID:5442
+- Third failure (Attempt 3 - Limit Reached): Returns ERR 006 TOO_MANY_ATTEMPTS SID:5442, immediately terminates and closes only that connection, and logs a WARNING event.
+- A successful AUTH before reaching the limit (Attempt 1 or 2) resets/succeeds normally without lockout.
+
+============================================================
+(2) CONNECTION CLOSED AFTER LIMIT:
+============================================================
+Controller Output:
+controller> AUTH wrong1
+Agent Response: ERR 001 AUTH_FAILED SID:5442
+controller> AUTH wrong2
+Agent Response: ERR 001 AUTH_FAILED SID:5442
+controller> AUTH wrong3
+Agent Response: ERR 006 TOO_MANY_ATTEMPTS SID:5442
+[-] Connection closed by server: Maximum failed authentication attempts exceeded.
+Connection closed.
+
+============================================================
+(3) SECOND CONTROLLER CONCURRENT LOGIN:
+============================================================
+While Controller 1 is locked out and closed, Controller 2 connects simultaneously:
+controller2> AUTH OPS-2445
+Agent Response: OK AUTHENTICATED SID:5442
+controller2> TIME
+Agent Response: OK TIME 1791800045 2026-10-12 12:15:45 SID:5442
+(Connection remains active and unaffected)
+
+============================================================
+(4) WARNING LOG LINE:
+============================================================
+Recorded in remoteops_IT24102445.log:
+[Mon Oct 12 12:15:30 2026] WARNING: Too many failed AUTH attempts (3/3) from 127.0.0.1 - closing connection
