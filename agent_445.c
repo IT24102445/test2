@@ -14,7 +14,6 @@
 #define AUTH_TOKEN "OPS-2445"
 #define LOG_FILE "remoteops_IT24102445.log"
 #define STORAGE_DIR "./agentfiles/IT24102445"
-#define MAX_AUTH_ATTEMPTS 3
 
 #define BUFFER_SIZE 4096
 #define LOG_BUF_SIZE (BUFFER_SIZE + 512)
@@ -81,14 +80,6 @@ int read_line(int socket_fd, char *buffer, size_t max_len) {
     return count;
 }
 
-void send_time_response(int client_fd) {
-    time_t now = time(NULL);
-    struct tm *tm_info = localtime(&now);
-    char time_str[64];
-    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
-    dprintf(client_fd, "OK TIME %ld %s %s\n", (long)now, time_str, SID_TAG);
-}
-
 void *handle_client(void *arg) {
     client_args_t *args = (client_args_t *)arg;
     int client_fd = args->client_fd;
@@ -103,7 +94,6 @@ void *handle_client(void *arg) {
     log_event(log_buf);
 
     int authenticated = 0;
-    int failed_auth_attempts = 0;
     udp_monitor_t monitor = {0, 0, client_addr, 0};
     char buffer[BUFFER_SIZE];
 
@@ -123,59 +113,24 @@ void *handle_client(void *arg) {
 
         // 1. Authentication Check
         if (!authenticated) {
-            // TIME is the only command allowed before authentication
-            if (strcmp(buffer, "TIME") == 0 || strncmp(buffer, "TIME ", 5) == 0) {
-                send_time_response(client_fd);
-                log_event("TIME command processed successfully (before auth)");
-                continue;
-            }
-
             char token[128];
             if (sscanf(buffer, "AUTH %127s", token) == 1) {
                 if (strcmp(token, AUTH_TOKEN) == 0) {
                     authenticated = 1;
-                    failed_auth_attempts = 0;
                     dprintf(client_fd, "OK AUTHENTICATED %s\n", SID_TAG);
                     log_event("Authentication successful");
                 } else {
-                    failed_auth_attempts++;
-                    if (failed_auth_attempts >= MAX_AUTH_ATTEMPTS) {
-                        dprintf(client_fd, "ERR 006 TOO_MANY_ATTEMPTS %s\n", SID_TAG);
-                        snprintf(log_buf, sizeof(log_buf), "WARNING: Too many failed AUTH attempts (%d/%d) from %s - closing connection", 
-                                 failed_auth_attempts, MAX_AUTH_ATTEMPTS, ip_str);
-                        log_event(log_buf);
-                        printf("[WARNING] Client %s exceeded max failed AUTH attempts (%d/%d) - closing connection\n", 
-                               ip_str, failed_auth_attempts, MAX_AUTH_ATTEMPTS);
-                        break;
-                    } else {
-                        dprintf(client_fd, "ERR 001 AUTH_FAILED %s\n", SID_TAG);
-                        log_event("Authentication failed: invalid token");
-                    }
+                    dprintf(client_fd, "ERR 001 AUTH_FAILED %s\n", SID_TAG);
+                    log_event("Authentication failed: invalid token");
                 }
             } else {
-                failed_auth_attempts++;
-                if (failed_auth_attempts >= MAX_AUTH_ATTEMPTS) {
-                    dprintf(client_fd, "ERR 006 TOO_MANY_ATTEMPTS %s\n", SID_TAG);
-                    snprintf(log_buf, sizeof(log_buf), "WARNING: Too many failed AUTH attempts (%d/%d) from %s - closing connection", 
-                             failed_auth_attempts, MAX_AUTH_ATTEMPTS, ip_str);
-                    log_event(log_buf);
-                    printf("[WARNING] Client %s exceeded max failed AUTH attempts (%d/%d) - closing connection\n", 
-                           ip_str, failed_auth_attempts, MAX_AUTH_ATTEMPTS);
-                    break;
-                } else {
-                    dprintf(client_fd, "ERR 001 AUTH_FAILED %s\n", SID_TAG);
-                    log_event("Authentication failed: command rejected before authentication");
-                }
+                dprintf(client_fd, "ERR 001 AUTH_FAILED %s\n", SID_TAG);
             }
             continue;
         }
 
         // 2. Command Processing
-        if (strcmp(buffer, "TIME") == 0 || strncmp(buffer, "TIME ", 5) == 0) {
-            send_time_response(client_fd);
-            log_event("TIME command processed successfully (after auth)");
-        }
-        else if (strcmp(buffer, "SYSINFO") == 0 || strncmp(buffer, "SYSINFO ", 8) == 0) {
+        if (strcmp(buffer, "SYSINFO") == 0 || strncmp(buffer, "SYSINFO ", 8) == 0) {
             dprintf(client_fd, "OK SYSINFO 0.15 512MB 3600 %s\n", SID_TAG);
         } 
         else if (strcmp(buffer, "LISTPROC") == 0 || strncmp(buffer, "LISTPROC ", 9) == 0) {
