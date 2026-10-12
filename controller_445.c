@@ -119,6 +119,10 @@ int connect_and_auto_auth(const char *ip, int port) {
 int main(int argc, char *argv[]) {
     const char *target_ip = AGENT_IP;
     int auto_auth = 1;
+    char recv_buf[BUFFER_SIZE];
+    char user_input[BUFFER_SIZE];
+    pthread_t udp_thread;
+    int udp_port = 8888;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--no-auth") == 0 || strcmp(argv[i], "--manual") == 0) {
