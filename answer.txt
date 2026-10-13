@@ -1,45 +1,56 @@
-IE3090 - Network Programming (Lab Test Version 1.A)
+IE3090 - Network Programming (Lab Test Version 1.C)
 Student Registration Number: IT24102445
 Session Identification Tag (SID): SID:5442
 Authentication Token: OPS-2445
+Personalised Storage Path: ./agentfiles/IT24102445/
 
 ============================================================
-(1) CALCULATED LIMIT:
+DESCRIBE YOUR CHANGE (3-5 sentences):
 ============================================================
-Failed AUTH Attempt Limit = 3 attempts per connection
-
-Details:
-- Each individual TCP client connection is tracked independently in its own thread.
-- First failure (Attempt 1): Returns ERR 001 AUTH_FAILED SID:5442
-- Second failure (Attempt 2): Returns ERR 001 AUTH_FAILED SID:5442
-- Third failure (Attempt 3 - Limit Reached): Returns ERR 006 TOO_MANY_ATTEMPTS SID:5442, immediately terminates and closes only that connection, and logs a WARNING event.
-- A successful AUTH before reaching the limit (Attempt 1 or 2) resets/succeeds normally without lockout.
+The personalised storage path is built using the pre-configured constant STORAGE_DIR ("./agentfiles/IT24102445"), which embeds the student registration number, and individual file paths are dynamically constructed using snprintf(fullpath, sizeof(fullpath), "%s/%s", STORAGE_DIR, entry->d_name). To read the folder contents, POSIX directory stream system functions opendir() and readdir() from <dirent.h> are used to iterate over all entries while explicitly skipping "." and "..". To read the file metadata and sizes, the stat() system call from <sys/stat.h> is invoked on each file path, using S_ISREG(st.st_mode) to exclude sub-folders and retrieving the exact file size via st.st_size. Finally, the agent responds with "OK FILES <count> <name1>:<size1>,<name2>:<size2>,... SID:5442", or "OK FILES 0 NONE SID:5442" if empty or missing, and logs the execution.
 
 ============================================================
-(2) CONNECTION CLOSED AFTER LIMIT:
+MUST SHOW OUTPUTS:
 ============================================================
-Controller Output:
-controller> AUTH wrong1
-Agent Response: ERR 001 AUTH_FAILED SID:5442
-controller> AUTH wrong2
-Agent Response: ERR 001 AUTH_FAILED SID:5442
-controller> AUTH wrong3
-Agent Response: ERR 006 TOO_MANY_ATTEMPTS SID:5442
-[-] Connection closed by server: Maximum failed authentication attempts exceeded.
-Connection closed.
 
-============================================================
-(3) SECOND CONTROLLER CONCURRENT LOGIN:
-============================================================
-While Controller 1 is locked out and closed, Controller 2 connects simultaneously:
-controller2> AUTH OPS-2445
-Agent Response: OK AUTHENTICATED SID:5442
-controller2> TIME
-Agent Response: OK TIME 1791800045 2026-10-12 12:15:45 SID:5442
-(Connection remains active and unaffected)
+(1) LIST WHEN EMPTY:
+------------------------------------------------------------
+controller> LIST
+Agent Response: OK FILES 0 NONE SID:5442
 
-============================================================
-(4) WARNING LOG LINE:
-============================================================
-Recorded in remoteops_IT24102445.log:
-[Mon Oct 12 12:15:30 2026] WARNING: Too many failed AUTH attempts (3/3) from 127.0.0.1 - closing connection
+(2) TWO PUTS THEN LIST WITH THE RIGHT SIZES:
+------------------------------------------------------------
+controller> PUT test.txt
+Agent Response: OK READY_TO_RECEIVE SID:5442
+[TRANSFER PUT] Speed: 24000.00 B/s (23.44 KB/s)
+Agent Response: OK FILE_RECEIVED test.txt SID:5442
+
+controller> PUT sample.txt
+Agent Response: OK READY_TO_RECEIVE SID:5442
+[TRANSFER PUT] Speed: 40000.00 B/s (39.06 KB/s)
+Agent Response: OK FILE_RECEIVED sample.txt SID:5442
+
+controller> LIST
+Agent Response: OK FILES 2 test.txt:24,sample.txt:40 SID:5442
+
+(3) ls -l ./agentfiles/IT24102445/ BESIDE IT TO PROVE SIZES MATCH:
+------------------------------------------------------------
+$ ls -l ./agentfiles/IT24102445/
+total 8
+-rw-r--r-- 1 student student 40 Oct 13 09:05 sample.txt
+-rw-r--r-- 1 student student 24 Oct 13 09:04 test.txt
+
+Verification:
+- test.txt:   24 bytes (Matches LIST output test.txt:24)
+- sample.txt: 40 bytes (Matches LIST output sample.txt:40)
+
+(4) THE LOG ENTRY (remoteops_IT24102445.log):
+------------------------------------------------------------
+[Tue Oct 13 09:04:10 2026] Received command from 127.0.0.1: LIST
+[Tue Oct 13 09:04:10 2026] LIST executed: 0 files listed in ./agentfiles/IT24102445
+[Tue Oct 13 09:04:30 2026] Received command from 127.0.0.1: PUT test.txt 24
+[Tue Oct 13 09:04:30 2026] File uploaded: test.txt (Throughput: 23.44 KB/s)
+[Tue Oct 13 09:04:50 2026] Received command from 127.0.0.1: PUT sample.txt 40
+[Tue Oct 13 09:04:50 2026] File uploaded: sample.txt (Throughput: 39.06 KB/s)
+[Tue Oct 13 09:05:10 2026] Received command from 127.0.0.1: LIST
+[Tue Oct 13 09:05:10 2026] LIST executed: 2 files listed in ./agentfiles/IT24102445
