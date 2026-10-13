@@ -6,7 +6,6 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <dirent.h>
 #include <time.h>
 #include <errno.h>
 
@@ -136,64 +135,6 @@ void *handle_client(void *arg) {
         } 
         else if (strcmp(buffer, "LISTPROC") == 0 || strncmp(buffer, "LISTPROC ", 9) == 0) {
             dprintf(client_fd, "OK PROCS 1:init,102:systemd,445:agent %s\n", SID_TAG);
-        } 
-        else if (strcmp(buffer, "LIST") == 0 || strncmp(buffer, "LIST ", 5) == 0) {
-            DIR *dir = opendir(STORAGE_DIR);
-            if (!dir) {
-                dprintf(client_fd, "OK FILES 0 NONE %s\n", SID_TAG);
-                snprintf(log_buf, sizeof(log_buf), "LIST executed: directory missing or empty (0 files)");
-                log_event(log_buf);
-            } else {
-                struct dirent *entry;
-                char file_list[BUFFER_SIZE] = "";
-                int count = 0;
-                size_t offset = 0;
-
-                while ((entry = readdir(dir)) != NULL) {
-                    // Skip . and ..
-                    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-                        continue;
-                    }
-
-                    // Construct full path for stat()
-                    char fullpath[1024];
-                    snprintf(fullpath, sizeof(fullpath), "%s/%s", STORAGE_DIR, entry->d_name);
-
-                    struct stat st;
-                    if (stat(fullpath, &st) == -1) {
-                        continue;
-                    }
-
-                    // Skip any sub-folders (only include regular files)
-                    if (!S_ISREG(st.st_mode)) {
-                        continue;
-                    }
-
-                    char item[512];
-                    int item_len;
-                    if (count == 0) {
-                        item_len = snprintf(item, sizeof(item), "%s:%ld", entry->d_name, (long)st.st_size);
-                    } else {
-                        item_len = snprintf(item, sizeof(item), ",%s:%ld", entry->d_name, (long)st.st_size);
-                    }
-
-                    if (offset + item_len < sizeof(file_list)) {
-                        memcpy(file_list + offset, item, item_len + 1);
-                        offset += item_len;
-                    }
-                    count++;
-                }
-                closedir(dir);
-
-                if (count == 0) {
-                    dprintf(client_fd, "OK FILES 0 NONE %s\n", SID_TAG);
-                } else {
-                    dprintf(client_fd, "OK FILES %d %s %s\n", count, file_list, SID_TAG);
-                }
-
-                snprintf(log_buf, sizeof(log_buf), "LIST executed: %d files listed in %s", count, STORAGE_DIR);
-                log_event(log_buf);
-            }
         } 
         else if (strncmp(buffer, "PUT", 3) == 0) {
             char filename[256];

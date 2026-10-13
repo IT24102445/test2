@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
     int udp_port = 8888;
 
     printf("\n=== Controller Active (Auto-Authenticated) ===\n");
-    printf("Type commands to send (e.g. SYSINFO, LISTPROC, LIST, PUT <file>, GET <file>, MONITOR START 8888, QUIT):\n\n");
+    printf("Type commands to send (e.g. SYSINFO, LISTPROC, PUT <file>, GET <file>, MONITOR START 8888, QUIT):\n\n");
 
     while (1) {
         printf("controller> ");
