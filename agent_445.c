@@ -14,6 +14,7 @@
 #define AUTH_TOKEN "OPS-2445"
 #define LOG_FILE "remoteops_IT24102445.log"
 #define STORAGE_DIR "./agentfiles/IT24102445"
+#define MAX_AUTH_ATTEMPTS 3
 
 #define BUFFER_SIZE 4096
 #define LOG_BUF_SIZE (BUFFER_SIZE + 512)
@@ -94,6 +95,7 @@ void *handle_client(void *arg) {
     log_event(log_buf);
 
     int authenticated = 0;
+    int failed_auth_attempts = 0;
     udp_monitor_t monitor = {0, 0, client_addr, 0};
     char buffer[BUFFER_SIZE];
 
@@ -117,14 +119,34 @@ void *handle_client(void *arg) {
             if (sscanf(buffer, "AUTH %127s", token) == 1) {
                 if (strcmp(token, AUTH_TOKEN) == 0) {
                     authenticated = 1;
+                    failed_auth_attempts = 0;
                     dprintf(client_fd, "OK AUTHENTICATED %s\n", SID_TAG);
                     log_event("Authentication successful");
                 } else {
-                    dprintf(client_fd, "ERR 001 AUTH_FAILED %s\n", SID_TAG);
-                    log_event("Authentication failed: invalid token");
+                    failed_auth_attempts++;
+                    if (failed_auth_attempts >= MAX_AUTH_ATTEMPTS) {
+                        dprintf(client_fd, "ERR 006 TOO_MANY_ATTEMPTS %s\n", SID_TAG);
+                        snprintf(log_buf, sizeof(log_buf), "WARNING: Too many failed AUTH attempts (%d/%d) from %s - closing connection", 
+                                 failed_auth_attempts, MAX_AUTH_ATTEMPTS, ip_str);
+                        log_event(log_buf);
+                        break;
+                    } else {
+                        dprintf(client_fd, "ERR 001 AUTH_FAILED %s\n", SID_TAG);
+                        log_event("Authentication failed: invalid token");
+                    }
                 }
             } else {
-                dprintf(client_fd, "ERR 001 AUTH_FAILED %s\n", SID_TAG);
+                failed_auth_attempts++;
+                if (failed_auth_attempts >= MAX_AUTH_ATTEMPTS) {
+                    dprintf(client_fd, "ERR 006 TOO_MANY_ATTEMPTS %s\n", SID_TAG);
+                    snprintf(log_buf, sizeof(log_buf), "WARNING: Too many failed AUTH attempts (%d/%d) from %s - closing connection", 
+                             failed_auth_attempts, MAX_AUTH_ATTEMPTS, ip_str);
+                    log_event(log_buf);
+                    break;
+                } else {
+                    dprintf(client_fd, "ERR 001 AUTH_FAILED %s\n", SID_TAG);
+                    log_event("Authentication failed: command rejected before authentication");
+                }
             }
             continue;
         }
